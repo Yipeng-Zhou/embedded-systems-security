@@ -1,0 +1,891 @@
+   1              		.cpu cortex-m4
+   2              		.eabi_attribute 27, 1
+   3              		.eabi_attribute 20, 1
+   4              		.eabi_attribute 21, 1
+   5              		.eabi_attribute 23, 3
+   6              		.eabi_attribute 24, 1
+   7              		.eabi_attribute 25, 1
+   8              		.eabi_attribute 26, 1
+   9              		.eabi_attribute 30, 1
+  10              		.eabi_attribute 34, 1
+  11              		.eabi_attribute 18, 4
+  12              		.file	"packetizer.c"
+  13              		.text
+  14              	.Ltext0:
+  15              		.cfi_sections	.debug_frame
+  16              		.section	.text.packetizerReceiveByteBlocking,"ax",%progbits
+  17              		.align	1
+  18              		.global	packetizerReceiveByteBlocking
+  19              		.syntax unified
+  20              		.thumb
+  21              		.thumb_func
+  22              		.fpu fpv4-sp-d16
+  24              	packetizerReceiveByteBlocking:
+  25              	.LFB193:
+  26              		.file 1 "packetizer.c"
+   1:packetizer.c  **** /* Source file for parsing the packet protocol used in assignment 2
+   2:packetizer.c  ****  *
+   3:packetizer.c  ****  * Copyright 2018 TUM
+   4:packetizer.c  ****  * Created: 2018-11-15 Florian Wilde <florian.wilde@tum.de>
+   5:packetizer.c  ****  **************************************************************************************************
+   6:packetizer.c  **** 
+   7:packetizer.c  **** #include "VirtualSerial.h"
+   8:packetizer.c  **** #include "base64url.h"
+   9:packetizer.c  **** #include "packetizer.h"
+  10:packetizer.c  **** 
+  11:packetizer.c  **** int16_t packetizerReceiveByteBlocking(void) {
+  27              		.loc 1 11 0
+  28              		.cfi_startproc
+  29              		@ args = 0, pretend = 0, frame = 0
+  30              		@ frame_needed = 0, uses_anonymous_args = 0
+  31 0000 10B5     		push	{r4, lr}
+  32              	.LCFI0:
+  33              		.cfi_def_cfa_offset 8
+  34              		.cfi_offset 4, -8
+  35              		.cfi_offset 14, -4
+  12:packetizer.c  ****   /* Wait until at least one byte is received and if so return it */
+  13:packetizer.c  ****   while(CDC_Device_BytesReceived(&VirtualSerial_CDC_Interface) <= 0) {
+  36              		.loc 1 13 0
+  37 0002 074C     		ldr	r4, .L5
+  38 0004 02E0     		b	.L2
+  39              	.L3:
+  14:packetizer.c  ****     CDC_Device_USBTask(&VirtualSerial_CDC_Interface);
+  40              		.loc 1 14 0
+  41 0006 2046     		mov	r0, r4
+  42 0008 FFF7FEFF 		bl	CDC_Device_USBTask
+  43              	.LVL0:
+  44              	.L2:
+  13:packetizer.c  ****     CDC_Device_USBTask(&VirtualSerial_CDC_Interface);
+  45              		.loc 1 13 0
+  46 000c 2046     		mov	r0, r4
+  47 000e FFF7FEFF 		bl	CDC_Device_BytesReceived
+  48              	.LVL1:
+  49 0012 0028     		cmp	r0, #0
+  50 0014 F7D0     		beq	.L3
+  15:packetizer.c  ****   }
+  16:packetizer.c  ****   return CDC_Device_ReceiveByte(&VirtualSerial_CDC_Interface);
+  51              		.loc 1 16 0
+  52 0016 0248     		ldr	r0, .L5
+  53 0018 FFF7FEFF 		bl	CDC_Device_ReceiveByte
+  54              	.LVL2:
+  17:packetizer.c  **** }
+  55              		.loc 1 17 0
+  56 001c 10BD     		pop	{r4, pc}
+  57              	.L6:
+  58 001e 00BF     		.align	2
+  59              	.L5:
+  60 0020 00000000 		.word	VirtualSerial_CDC_Interface
+  61              		.cfi_endproc
+  62              	.LFE193:
+  64              		.section	.text.packetizerReadHeader,"ax",%progbits
+  65              		.align	1
+  66              		.global	packetizerReadHeader
+  67              		.syntax unified
+  68              		.thumb
+  69              		.thumb_func
+  70              		.fpu fpv4-sp-d16
+  72              	packetizerReadHeader:
+  73              	.LFB194:
+  18:packetizer.c  **** 
+  19:packetizer.c  **** enum packetizerErrors packetizerReadHeader(pt_s *job) {
+  74              		.loc 1 19 0
+  75              		.cfi_startproc
+  76              		@ args = 0, pretend = 0, frame = 72
+  77              		@ frame_needed = 0, uses_anonymous_args = 0
+  78              	.LVL3:
+  79 0000 F0B5     		push	{r4, r5, r6, r7, lr}
+  80              	.LCFI1:
+  81              		.cfi_def_cfa_offset 20
+  82              		.cfi_offset 4, -20
+  83              		.cfi_offset 5, -16
+  84              		.cfi_offset 6, -12
+  85              		.cfi_offset 7, -8
+  86              		.cfi_offset 14, -4
+  87 0002 93B0     		sub	sp, sp, #76
+  88              	.LCFI2:
+  89              		.cfi_def_cfa_offset 96
+  90 0004 0746     		mov	r7, r0
+  91              		.loc 1 19 0
+  92 0006 354B     		ldr	r3, .L27
+  93 0008 1B68     		ldr	r3, [r3]
+  94 000a 1193     		str	r3, [sp, #68]
+  20:packetizer.c  ****   /* We received a start of header (SoH, 0x01) and now gather all the bytes that belong to the
+  21:packetizer.c  ****      header up to and including the start of text (SoT, 0x02) to see if the header is too long */
+  22:packetizer.c  ****   char headerB64[PACKETIZER_HEADER_B64_LEN] = { 0 };
+  95              		.loc 1 22 0
+  96 000c 2422     		movs	r2, #36
+  97 000e 0021     		movs	r1, #0
+  98 0010 08A8     		add	r0, sp, #32
+  99              	.LVL4:
+ 100 0012 FFF7FEFF 		bl	memset
+ 101              	.LVL5:
+  23:packetizer.c  ****   char header[PACKETIZER_HEADER_LEN] = { 0 };
+ 102              		.loc 1 23 0
+ 103 0016 0025     		movs	r5, #0
+ 104 0018 0195     		str	r5, [sp, #4]
+ 105 001a 0295     		str	r5, [sp, #8]
+ 106 001c 0395     		str	r5, [sp, #12]
+ 107 001e 0495     		str	r5, [sp, #16]
+ 108 0020 0595     		str	r5, [sp, #20]
+ 109 0022 0695     		str	r5, [sp, #24]
+ 110 0024 CDF81B50 		str	r5, [sp, #27]	@ unaligned
+  24:packetizer.c  ****   size_t header_len = sizeof(header);
+ 111              		.loc 1 24 0
+ 112 0028 1B23     		movs	r3, #27
+ 113 002a 0093     		str	r3, [sp]
+ 114              	.LVL6:
+ 115              	.L8:
+ 116              	.LBB2:
+  25:packetizer.c  ****   int16_t rbuf = 0;
+  26:packetizer.c  ****  
+  27:packetizer.c  ****   for(size_t headerB64idx = 0; headerB64idx < PACKETIZER_HEADER_B64_LEN; ) {
+  28:packetizer.c  ****     rbuf = packetizerReceiveByteBlocking();
+ 117              		.loc 1 28 0
+ 118 002c FFF7FEFF 		bl	packetizerReceiveByteBlocking
+ 119              	.LVL7:
+ 120 0030 0446     		mov	r4, r0
+ 121              	.LVL8:
+  29:packetizer.c  **** 
+  30:packetizer.c  ****     if(rbuf > 0xFF) {
+ 122              		.loc 1 30 0
+ 123 0032 FF28     		cmp	r0, #255
+ 124 0034 0DDD     		ble	.L23
+  27:packetizer.c  ****     rbuf = packetizerReceiveByteBlocking();
+ 125              		.loc 1 27 0 discriminator 1
+ 126 0036 232D     		cmp	r5, #35
+ 127 0038 F8D9     		bls	.L8
+ 128              	.LVL9:
+ 129              	.L13:
+ 130              	.LBE2:
+  31:packetizer.c  ****       /* Error in CDC_Device_ReceiveByte(), ignore it */
+  32:packetizer.c  ****     } else if(rbuf == 0x02) {
+  33:packetizer.c  ****       /* A premature SoT means the header is too short */
+  34:packetizer.c  ****       return packetizer_HeaderIncorrectSize;
+  35:packetizer.c  ****     } else if(isbase64(rbuf) || rbuf == '=') {
+  36:packetizer.c  ****       headerB64[headerB64idx++] = rbuf;
+  37:packetizer.c  ****     } else {
+  38:packetizer.c  ****       /* Return appropriate error if we encounter a character not in the base64url alphabet.
+  39:packetizer.c  ****          Because isbase64() considers padding to be not part of the alphabet, allow it also. */
+  40:packetizer.c  ****       return packetizer_IllegalCharacter;
+  41:packetizer.c  ****     }
+  42:packetizer.c  ****   }
+  43:packetizer.c  ****   /* Here we wait for the SoT to check that the header is not too long */
+  44:packetizer.c  ****   if(packetizerReceiveByteBlocking() != 0x02) {
+ 131              		.loc 1 44 0
+ 132 003a FFF7FEFF 		bl	packetizerReceiveByteBlocking
+ 133              	.LVL10:
+ 134 003e 0228     		cmp	r0, #2
+ 135 0040 19D0     		beq	.L24
+  45:packetizer.c  ****     return packetizer_HeaderIncorrectSize;
+ 136              		.loc 1 45 0
+ 137 0042 0220     		movs	r0, #2
+ 138              	.L10:
+  46:packetizer.c  ****   }
+  47:packetizer.c  ****   /* We received a header of correct size, so remove base64url encoding and put content into job */
+  48:packetizer.c  ****   if(base64_decode(headerB64, PACKETIZER_HEADER_B64_LEN, header, &header_len)) {
+  49:packetizer.c  ****     if(header_len == sizeof(header)) {
+  50:packetizer.c  ****       job->textLen = header[2] << 16 | header[1] << 8 | header[0];
+  51:packetizer.c  ****       job->nonce = malloc(CRYPTO_NONCE_BYTES);
+  52:packetizer.c  ****       if(job->nonce != NULL) {
+  53:packetizer.c  ****         memcpy(job->nonce, header + 3, CRYPTO_NONCE_BYTES);
+  54:packetizer.c  ****       } else {
+  55:packetizer.c  ****         return packetizer_NonceAllocationFailed;
+  56:packetizer.c  ****       }
+  57:packetizer.c  ****     } else {
+  58:packetizer.c  ****       /* If decoded length does not match, header is also of incorrect length */
+  59:packetizer.c  ****       return packetizer_HeaderIncorrectSize;
+  60:packetizer.c  ****     }
+  61:packetizer.c  ****   } else {
+  62:packetizer.c  ****     /* Decoding failed, e.g. because padding was incorrect */
+  63:packetizer.c  ****     return packetizer_HeaderDecodingFailed;
+  64:packetizer.c  ****   }
+  65:packetizer.c  ****   return packetizer_Successful;
+  66:packetizer.c  **** }
+ 139              		.loc 1 66 0
+ 140 0044 119A     		ldr	r2, [sp, #68]
+ 141 0046 254B     		ldr	r3, .L27
+ 142 0048 1B68     		ldr	r3, [r3]
+ 143 004a 9A42     		cmp	r2, r3
+ 144 004c 44D1     		bne	.L25
+ 145 004e 13B0     		add	sp, sp, #76
+ 146              	.LCFI3:
+ 147              		.cfi_remember_state
+ 148              		.cfi_def_cfa_offset 20
+ 149              		@ sp needed
+ 150 0050 F0BD     		pop	{r4, r5, r6, r7, pc}
+ 151              	.LVL11:
+ 152              	.L23:
+ 153              	.LCFI4:
+ 154              		.cfi_restore_state
+ 155              	.LBB3:
+  32:packetizer.c  ****       /* A premature SoT means the header is too short */
+ 156              		.loc 1 32 0
+ 157 0052 0228     		cmp	r0, #2
+ 158 0054 38D0     		beq	.L15
+  35:packetizer.c  ****       headerB64[headerB64idx++] = rbuf;
+ 159              		.loc 1 35 0
+ 160 0056 C6B2     		uxtb	r6, r0
+ 161 0058 3046     		mov	r0, r6
+ 162              	.LVL12:
+ 163 005a FFF7FEFF 		bl	isbase64
+ 164              	.LVL13:
+ 165 005e 08B9     		cbnz	r0, .L11
+  35:packetizer.c  ****       headerB64[headerB64idx++] = rbuf;
+ 166              		.loc 1 35 0 is_stmt 0 discriminator 1
+ 167 0060 3D2C     		cmp	r4, #61
+ 168 0062 33D1     		bne	.L16
+ 169              	.L11:
+  36:packetizer.c  ****     } else {
+ 170              		.loc 1 36 0 is_stmt 1
+ 171 0064 6B1C     		adds	r3, r5, #1
+ 172              	.LVL14:
+ 173 0066 12AA     		add	r2, sp, #72
+ 174 0068 1544     		add	r5, r5, r2
+ 175 006a 05F8286C 		strb	r6, [r5, #-40]
+  27:packetizer.c  ****     rbuf = packetizerReceiveByteBlocking();
+ 176              		.loc 1 27 0
+ 177 006e 232B     		cmp	r3, #35
+ 178 0070 E3D8     		bhi	.L13
+  36:packetizer.c  ****     } else {
+ 179              		.loc 1 36 0
+ 180 0072 1D46     		mov	r5, r3
+ 181 0074 DAE7     		b	.L8
+ 182              	.LVL15:
+ 183              	.L24:
+ 184              	.LBE3:
+  48:packetizer.c  ****     if(header_len == sizeof(header)) {
+ 185              		.loc 1 48 0
+ 186 0076 6B46     		mov	r3, sp
+ 187 0078 01AA     		add	r2, sp, #4
+ 188 007a 2421     		movs	r1, #36
+ 189 007c 08A8     		add	r0, sp, #32
+ 190 007e FFF7FEFF 		bl	base64_decode
+ 191              	.LVL16:
+ 192 0082 28B3     		cbz	r0, .L19
+  49:packetizer.c  ****       job->textLen = header[2] << 16 | header[1] << 8 | header[0];
+ 193              		.loc 1 49 0
+ 194 0084 009B     		ldr	r3, [sp]
+ 195 0086 1B2B     		cmp	r3, #27
+ 196 0088 01D0     		beq	.L26
+  59:packetizer.c  ****     }
+ 197              		.loc 1 59 0
+ 198 008a 0220     		movs	r0, #2
+ 199 008c DAE7     		b	.L10
+ 200              	.L26:
+  50:packetizer.c  ****       job->nonce = malloc(CRYPTO_NONCE_BYTES);
+ 201              		.loc 1 50 0
+ 202 008e 9DF80620 		ldrb	r2, [sp, #6]	@ zero_extendqisi2
+ 203 0092 9DF80530 		ldrb	r3, [sp, #5]	@ zero_extendqisi2
+ 204 0096 1B02     		lsls	r3, r3, #8
+ 205 0098 43EA0243 		orr	r3, r3, r2, lsl #16
+ 206 009c 9DF80420 		ldrb	r2, [sp, #4]	@ zero_extendqisi2
+ 207 00a0 1343     		orrs	r3, r3, r2
+ 208 00a2 7B60     		str	r3, [r7, #4]
+  51:packetizer.c  ****       if(job->nonce != NULL) {
+ 209              		.loc 1 51 0
+ 210 00a4 1820     		movs	r0, #24
+ 211 00a6 FFF7FEFF 		bl	malloc
+ 212              	.LVL17:
+ 213 00aa B860     		str	r0, [r7, #8]
+  52:packetizer.c  ****         memcpy(job->nonce, header + 3, CRYPTO_NONCE_BYTES);
+ 214              		.loc 1 52 0
+ 215 00ac 90B1     		cbz	r0, .L21
+  53:packetizer.c  ****       } else {
+ 216              		.loc 1 53 0
+ 217 00ae 12AD     		add	r5, sp, #72
+ 218 00b0 0446     		mov	r4, r0
+ 219 00b2 55F8410D 		ldr	r0, [r5, #-65]!	@ unaligned
+ 220 00b6 6968     		ldr	r1, [r5, #4]	@ unaligned
+ 221 00b8 AA68     		ldr	r2, [r5, #8]	@ unaligned
+ 222 00ba EB68     		ldr	r3, [r5, #12]	@ unaligned
+ 223 00bc 0FC4     		stmia	r4!, {r0, r1, r2, r3}
+ 224 00be 2869     		ldr	r0, [r5, #16]	@ unaligned
+ 225 00c0 6969     		ldr	r1, [r5, #20]	@ unaligned
+ 226 00c2 03C4     		stmia	r4!, {r0, r1}
+  65:packetizer.c  **** }
+ 227              		.loc 1 65 0
+ 228 00c4 0020     		movs	r0, #0
+ 229 00c6 BDE7     		b	.L10
+ 230              	.LVL18:
+ 231              	.L15:
+ 232              	.LBB4:
+  34:packetizer.c  ****     } else if(isbase64(rbuf) || rbuf == '=') {
+ 233              		.loc 1 34 0
+ 234 00c8 0220     		movs	r0, #2
+ 235              	.LVL19:
+ 236 00ca BBE7     		b	.L10
+ 237              	.L16:
+  40:packetizer.c  ****     }
+ 238              		.loc 1 40 0
+ 239 00cc 0120     		movs	r0, #1
+ 240 00ce B9E7     		b	.L10
+ 241              	.LVL20:
+ 242              	.L19:
+ 243              	.LBE4:
+  63:packetizer.c  ****   }
+ 244              		.loc 1 63 0
+ 245 00d0 0320     		movs	r0, #3
+ 246 00d2 B7E7     		b	.L10
+ 247              	.L21:
+  55:packetizer.c  ****       }
+ 248              		.loc 1 55 0
+ 249 00d4 0420     		movs	r0, #4
+ 250 00d6 B5E7     		b	.L10
+ 251              	.L25:
+ 252              		.loc 1 66 0
+ 253 00d8 FFF7FEFF 		bl	__stack_chk_fail
+ 254              	.LVL21:
+ 255              	.L28:
+ 256              		.align	2
+ 257              	.L27:
+ 258 00dc 00000000 		.word	__stack_chk_guard
+ 259              		.cfi_endproc
+ 260              	.LFE194:
+ 262              		.section	.text.packetizerReadText,"ax",%progbits
+ 263              		.align	1
+ 264              		.global	packetizerReadText
+ 265              		.syntax unified
+ 266              		.thumb
+ 267              		.thumb_func
+ 268              		.fpu fpv4-sp-d16
+ 270              	packetizerReadText:
+ 271              	.LFB195:
+  67:packetizer.c  **** 
+  68:packetizer.c  **** enum packetizerErrors packetizerReadText(pt_s *job) {
+ 272              		.loc 1 68 0
+ 273              		.cfi_startproc
+ 274              		@ args = 0, pretend = 0, frame = 8
+ 275              		@ frame_needed = 0, uses_anonymous_args = 0
+ 276              	.LVL22:
+ 277 0000 2DE9F047 		push	{r4, r5, r6, r7, r8, r9, r10, lr}
+ 278              	.LCFI5:
+ 279              		.cfi_def_cfa_offset 32
+ 280              		.cfi_offset 4, -32
+ 281              		.cfi_offset 5, -28
+ 282              		.cfi_offset 6, -24
+ 283              		.cfi_offset 7, -20
+ 284              		.cfi_offset 8, -16
+ 285              		.cfi_offset 9, -12
+ 286              		.cfi_offset 10, -8
+ 287              		.cfi_offset 14, -4
+ 288 0004 82B0     		sub	sp, sp, #8
+ 289              	.LCFI6:
+ 290              		.cfi_def_cfa_offset 40
+ 291 0006 0646     		mov	r6, r0
+ 292              	.LVL23:
+  69:packetizer.c  ****   /* We received a correct header, now allocate space for the text and receive it up to and
+  70:packetizer.c  ****      including the end of text (EoT, 0x03) to see if the text is too long. Then remove base64url
+  71:packetizer.c  ****      encoding */
+  72:packetizer.c  ****   enum packetizerErrors ret = packetizer_Successful;
+  73:packetizer.c  ****   int16_t rbuf = 0;
+  74:packetizer.c  ****   size_t textB64_len = job->textLen * sizeof(char), text_len = 0;
+ 293              		.loc 1 74 0
+ 294 0008 D0F80480 		ldr	r8, [r0, #4]
+ 295              	.LVL24:
+ 296 000c 0024     		movs	r4, #0
+ 297 000e 0094     		str	r4, [sp]
+  75:packetizer.c  ****   char *textB64 = calloc(job->textLen, sizeof(char)), *text = NULL;
+ 298              		.loc 1 75 0
+ 299 0010 0121     		movs	r1, #1
+ 300 0012 4046     		mov	r0, r8
+ 301              	.LVL25:
+ 302 0014 FFF7FEFF 		bl	calloc
+ 303              	.LVL26:
+ 304 0018 0194     		str	r4, [sp, #4]
+  76:packetizer.c  ****   if(textB64 == NULL) {
+ 305              		.loc 1 76 0
+ 306 001a 58B3     		cbz	r0, .L39
+ 307 001c 0746     		mov	r7, r0
+ 308 001e 00F1FF39 		add	r9, r0, #-1
+ 309              	.LBB5:
+  77:packetizer.c  ****     return packetizer_TextAllocationFailed;
+  78:packetizer.c  ****   }
+  79:packetizer.c  ****  
+  80:packetizer.c  ****   /* Allocate memory for text (in base64 yet) and receive it */
+  81:packetizer.c  ****   for(size_t textB64idx = 0; textB64idx < job->textLen; ) {
+ 310              		.loc 1 81 0
+ 311 0022 2546     		mov	r5, r4
+ 312              	.LVL27:
+ 313              	.L32:
+ 314              		.loc 1 81 0 is_stmt 0 discriminator 1
+ 315 0024 7368     		ldr	r3, [r6, #4]
+ 316 0026 AB42     		cmp	r3, r5
+ 317 0028 26D9     		bls	.L50
+  82:packetizer.c  ****     rbuf = packetizerReceiveByteBlocking();
+ 318              		.loc 1 82 0 is_stmt 1
+ 319 002a FFF7FEFF 		bl	packetizerReceiveByteBlocking
+ 320              	.LVL28:
+ 321 002e 0446     		mov	r4, r0
+ 322              	.LVL29:
+  83:packetizer.c  **** 
+  84:packetizer.c  ****     if(rbuf > 0xFF) {
+ 323              		.loc 1 84 0
+ 324 0030 FF28     		cmp	r0, #255
+ 325 0032 F7DC     		bgt	.L32
+  85:packetizer.c  ****       /* Error in CDC_Device_ReceiveByte(), ignore it */
+  86:packetizer.c  ****     } else if(rbuf == 0x03) {
+ 326              		.loc 1 86 0
+ 327 0034 0328     		cmp	r0, #3
+ 328 0036 2BD0     		beq	.L40
+  87:packetizer.c  ****       /* A premature EoT means the text is too short */
+  88:packetizer.c  ****       ret = packetizer_TextIncorrectSize;
+  89:packetizer.c  ****       break;
+  90:packetizer.c  ****     } else if(isbase64(rbuf) || rbuf == '=') {
+ 329              		.loc 1 90 0
+ 330 0038 5FFA80FA 		uxtb	r10, r0
+ 331 003c 5046     		mov	r0, r10
+ 332              	.LVL30:
+ 333 003e FFF7FEFF 		bl	isbase64
+ 334              	.LVL31:
+ 335 0042 08B9     		cbnz	r0, .L34
+ 336              		.loc 1 90 0 is_stmt 0 discriminator 1
+ 337 0044 3D2C     		cmp	r4, #61
+ 338 0046 25D1     		bne	.L41
+ 339              	.L34:
+  91:packetizer.c  ****       textB64[textB64idx++] = rbuf;
+ 340              		.loc 1 91 0 is_stmt 1
+ 341 0048 0135     		adds	r5, r5, #1
+ 342              	.LVL32:
+ 343 004a 09F801AF 		strb	r10, [r9, #1]!
+ 344 004e E9E7     		b	.L32
+ 345              	.L51:
+ 346              	.LBE5:
+  92:packetizer.c  ****     } else {
+  93:packetizer.c  ****       /* Return appropriate error if we encounter a character not in the base64url alphabet.
+  94:packetizer.c  ****          Because isbase64() considers padding to be not part of the alphabet, allow it also. */
+  95:packetizer.c  ****       ret = packetizer_IllegalCharacter;
+  96:packetizer.c  ****       break;
+  97:packetizer.c  ****     }
+  98:packetizer.c  ****   }
+  99:packetizer.c  ****   if(ret == packetizer_Successful) {
+ 100:packetizer.c  ****     /* Here we wait for the EoT to check that the text is not too long */
+ 101:packetizer.c  ****     if(packetizerReceiveByteBlocking() != 0x03) {
+ 102:packetizer.c  ****       ret = packetizer_TextIncorrectSize;
+ 103:packetizer.c  ****     }
+ 104:packetizer.c  ****   }
+ 105:packetizer.c  ****   if(ret == packetizer_Successful) {
+ 106:packetizer.c  ****     /* We received a text of correct size, so remove base64url encoding and put link into job */
+ 107:packetizer.c  ****     if(base64_decode_alloc(textB64, textB64_len, &text, &text_len)) {
+ 347              		.loc 1 107 0
+ 348 0050 6B46     		mov	r3, sp
+ 349 0052 01AA     		add	r2, sp, #4
+ 350 0054 4146     		mov	r1, r8
+ 351 0056 3846     		mov	r0, r7
+ 352 0058 FFF7FEFF 		bl	base64_decode_alloc
+ 353              	.LVL33:
+ 354 005c 30B1     		cbz	r0, .L42
+ 108:packetizer.c  ****       job->textLen = text_len;
+ 355              		.loc 1 108 0
+ 356 005e 009B     		ldr	r3, [sp]
+ 357 0060 7360     		str	r3, [r6, #4]
+ 109:packetizer.c  ****       if(text != NULL) {
+ 358              		.loc 1 109 0
+ 359 0062 019B     		ldr	r3, [sp, #4]
+ 360 0064 23B1     		cbz	r3, .L43
+ 110:packetizer.c  ****         job->text = (uint8_t *) text;
+ 361              		.loc 1 110 0
+ 362 0066 3360     		str	r3, [r6]
+ 363 0068 0024     		movs	r4, #0
+ 364 006a 0AE0     		b	.L37
+ 365              	.L42:
+ 111:packetizer.c  ****       } else {
+ 112:packetizer.c  ****         /* If text pointer is NULL, malloc failed */
+ 113:packetizer.c  ****         ret = packetizer_TextAllocationFailed;
+ 114:packetizer.c  ****       }
+ 115:packetizer.c  ****     } else {
+ 116:packetizer.c  ****       /* Decoding failed, e.g. because padding was incorrect */
+ 117:packetizer.c  ****       ret = packetizer_TextDecodingFailed;
+ 366              		.loc 1 117 0
+ 367 006c 0724     		movs	r4, #7
+ 368 006e 08E0     		b	.L37
+ 369              	.L43:
+ 113:packetizer.c  ****       }
+ 370              		.loc 1 113 0
+ 371 0070 0524     		movs	r4, #5
+ 372 0072 06E0     		b	.L37
+ 373              	.LVL34:
+ 374              	.L39:
+  77:packetizer.c  ****   }
+ 375              		.loc 1 77 0
+ 376 0074 0524     		movs	r4, #5
+ 377 0076 07E0     		b	.L47
+ 378              	.LVL35:
+ 379              	.L50:
+ 101:packetizer.c  ****       ret = packetizer_TextIncorrectSize;
+ 380              		.loc 1 101 0
+ 381 0078 FFF7FEFF 		bl	packetizerReceiveByteBlocking
+ 382              	.LVL36:
+ 383 007c 0328     		cmp	r0, #3
+ 384 007e E7D0     		beq	.L51
+ 102:packetizer.c  ****     }
+ 385              		.loc 1 102 0
+ 386 0080 0624     		movs	r4, #6
+ 387              	.LVL37:
+ 388              	.L37:
+ 118:packetizer.c  ****     }
+ 119:packetizer.c  ****   }
+ 120:packetizer.c  **** 
+ 121:packetizer.c  ****   /* Regardless of our outcome, we have to free the textB64, because we loose the pointer to it on
+ 122:packetizer.c  ****      return */
+ 123:packetizer.c  ****   free(textB64);
+ 389              		.loc 1 123 0
+ 390 0082 3846     		mov	r0, r7
+ 391 0084 FFF7FEFF 		bl	free
+ 392              	.LVL38:
+ 393              	.L47:
+ 124:packetizer.c  ****   return ret;
+ 125:packetizer.c  **** }
+ 394              		.loc 1 125 0
+ 395 0088 2046     		mov	r0, r4
+ 396 008a 02B0     		add	sp, sp, #8
+ 397              	.LCFI7:
+ 398              		.cfi_remember_state
+ 399              		.cfi_def_cfa_offset 32
+ 400              		@ sp needed
+ 401 008c BDE8F087 		pop	{r4, r5, r6, r7, r8, r9, r10, pc}
+ 402              	.LVL39:
+ 403              	.L40:
+ 404              	.LCFI8:
+ 405              		.cfi_restore_state
+ 406              	.LBB6:
+  88:packetizer.c  ****       break;
+ 407              		.loc 1 88 0
+ 408 0090 0624     		movs	r4, #6
+ 409 0092 F6E7     		b	.L37
+ 410              	.LVL40:
+ 411              	.L41:
+  95:packetizer.c  ****       break;
+ 412              		.loc 1 95 0
+ 413 0094 0124     		movs	r4, #1
+ 414              	.LVL41:
+ 415 0096 F4E7     		b	.L37
+ 416              	.LBE6:
+ 417              		.cfi_endproc
+ 418              	.LFE195:
+ 420              		.section	.text.packetizerReceive,"ax",%progbits
+ 421              		.align	1
+ 422              		.global	packetizerReceive
+ 423              		.syntax unified
+ 424              		.thumb
+ 425              		.thumb_func
+ 426              		.fpu fpv4-sp-d16
+ 428              	packetizerReceive:
+ 429              	.LFB196:
+ 126:packetizer.c  ****   
+ 127:packetizer.c  **** enum packetizerErrors packetizerReceive(pt_s *job) {
+ 430              		.loc 1 127 0
+ 431              		.cfi_startproc
+ 432              		@ args = 0, pretend = 0, frame = 0
+ 433              		@ frame_needed = 0, uses_anonymous_args = 0
+ 434              	.LVL42:
+ 435 0000 10B5     		push	{r4, lr}
+ 436              	.LCFI9:
+ 437              		.cfi_def_cfa_offset 8
+ 438              		.cfi_offset 4, -8
+ 439              		.cfi_offset 14, -4
+ 440 0002 0446     		mov	r4, r0
+ 441              	.LVL43:
+ 442              	.L53:
+ 128:packetizer.c  ****   enum packetizerErrors ret;
+ 129:packetizer.c  **** 
+ 130:packetizer.c  ****   /* Discard bytes until we find a start of header (SoH, 0x01) */
+ 131:packetizer.c  ****   while(packetizerReceiveByteBlocking() != 0x01);
+ 443              		.loc 1 131 0 discriminator 1
+ 444 0004 FFF7FEFF 		bl	packetizerReceiveByteBlocking
+ 445              	.LVL44:
+ 446 0008 0128     		cmp	r0, #1
+ 447 000a FBD1     		bne	.L53
+ 132:packetizer.c  ****   /* Read header and fill in job or forward error */
+ 133:packetizer.c  ****   ret = packetizerReadHeader(job);
+ 448              		.loc 1 133 0
+ 449 000c 2046     		mov	r0, r4
+ 450 000e FFF7FEFF 		bl	packetizerReadHeader
+ 451              	.LVL45:
+ 134:packetizer.c  ****   if(ret != packetizer_Successful) {
+ 452              		.loc 1 134 0
+ 453 0012 0346     		mov	r3, r0
+ 454 0014 08B1     		cbz	r0, .L57
+ 455              	.LVL46:
+ 456              	.L54:
+ 135:packetizer.c  ****     return ret;
+ 136:packetizer.c  ****   }
+ 137:packetizer.c  ****   /* Read text and add link to it to job or forward error */
+ 138:packetizer.c  ****   ret = packetizerReadText(job);
+ 139:packetizer.c  ****   if(ret != packetizer_Successful) {
+ 140:packetizer.c  ****     return ret;
+ 141:packetizer.c  ****   }
+ 142:packetizer.c  ****   return packetizer_Successful;
+ 143:packetizer.c  **** }
+ 457              		.loc 1 143 0
+ 458 0016 1846     		mov	r0, r3
+ 459 0018 10BD     		pop	{r4, pc}
+ 460              	.LVL47:
+ 461              	.L57:
+ 138:packetizer.c  ****   if(ret != packetizer_Successful) {
+ 462              		.loc 1 138 0
+ 463 001a 2046     		mov	r0, r4
+ 464              	.LVL48:
+ 465 001c FFF7FEFF 		bl	packetizerReadText
+ 466              	.LVL49:
+ 467 0020 0346     		mov	r3, r0
+ 468              	.LVL50:
+ 469 0022 F8E7     		b	.L54
+ 470              		.cfi_endproc
+ 471              	.LFE196:
+ 473              		.section	.text.packetizerSend,"ax",%progbits
+ 474              		.align	1
+ 475              		.global	packetizerSend
+ 476              		.syntax unified
+ 477              		.thumb
+ 478              		.thumb_func
+ 479              		.fpu fpv4-sp-d16
+ 481              	packetizerSend:
+ 482              	.LFB197:
+ 144:packetizer.c  **** 
+ 145:packetizer.c  **** enum packetizerErrors packetizerSend(ct_s *output) {
+ 483              		.loc 1 145 0
+ 484              		.cfi_startproc
+ 485              		@ args = 0, pretend = 0, frame = 8
+ 486              		@ frame_needed = 0, uses_anonymous_args = 0
+ 487              	.LVL51:
+ 488 0000 30B5     		push	{r4, r5, lr}
+ 489              	.LCFI10:
+ 490              		.cfi_def_cfa_offset 12
+ 491              		.cfi_offset 4, -12
+ 492              		.cfi_offset 5, -8
+ 493              		.cfi_offset 14, -4
+ 494 0002 83B0     		sub	sp, sp, #12
+ 495              	.LCFI11:
+ 496              		.cfi_def_cfa_offset 24
+ 497 0004 0446     		mov	r4, r0
+ 498              	.LVL52:
+ 146:packetizer.c  ****   enum packetizerErrors ret = packetizer_Successful;
+ 147:packetizer.c  ****   char *textB64 = NULL;
+ 499              		.loc 1 147 0
+ 500 0006 02AA     		add	r2, sp, #8
+ 501 0008 0023     		movs	r3, #0
+ 502 000a 42F8043D 		str	r3, [r2, #-4]!
+ 503              	.LVL53:
+ 148:packetizer.c  ****   size_t textB64_len = 0;
+ 149:packetizer.c  **** 
+ 150:packetizer.c  ****   /* Encode ciphertext into base64url, return fail if not successful */
+ 151:packetizer.c  ****   textB64_len = base64_encode_alloc((char *) output->text, output->textLen, &textB64);
+ 504              		.loc 1 151 0
+ 505 000e 4168     		ldr	r1, [r0, #4]
+ 506 0010 0068     		ldr	r0, [r0]
+ 507              	.LVL54:
+ 508 0012 FFF7FEFF 		bl	base64_encode_alloc
+ 509              	.LVL55:
+ 510 0016 0546     		mov	r5, r0
+ 511              	.LVL56:
+ 152:packetizer.c  ****   if(textB64 == NULL) {
+ 512              		.loc 1 152 0
+ 513 0018 019B     		ldr	r3, [sp, #4]
+ 514 001a 83B1     		cbz	r3, .L64
+ 153:packetizer.c  ****     if(output->textLen > 0 && textB64_len <= 0) {
+ 154:packetizer.c  ****       /* Size computation overflow in base64url.c */
+ 155:packetizer.c  ****       ret = packetizer_CiphertextTooLarge;
+ 156:packetizer.c  ****     } else {
+ 157:packetizer.c  ****       ret = packetizer_CiphertextAllocationFailed;
+ 158:packetizer.c  ****     }
+ 159:packetizer.c  ****   } else {
+ 160:packetizer.c  ****     CDC_Device_SendByte(&VirtualSerial_CDC_Interface, 0x02);
+ 515              		.loc 1 160 0
+ 516 001c 0C4C     		ldr	r4, .L65
+ 517              	.LVL57:
+ 518 001e 0221     		movs	r1, #2
+ 519 0020 2046     		mov	r0, r4
+ 520              	.LVL58:
+ 521 0022 FFF7FEFF 		bl	CDC_Device_SendByte
+ 522              	.LVL59:
+ 161:packetizer.c  ****     CDC_Device_SendData(&VirtualSerial_CDC_Interface, textB64, textB64_len);
+ 523              		.loc 1 161 0
+ 524 0026 AAB2     		uxth	r2, r5
+ 525 0028 0199     		ldr	r1, [sp, #4]
+ 526 002a 2046     		mov	r0, r4
+ 527 002c FFF7FEFF 		bl	CDC_Device_SendData
+ 528              	.LVL60:
+ 162:packetizer.c  ****     CDC_Device_SendByte(&VirtualSerial_CDC_Interface, 0x03);
+ 529              		.loc 1 162 0
+ 530 0030 0321     		movs	r1, #3
+ 531 0032 2046     		mov	r0, r4
+ 532 0034 FFF7FEFF 		bl	CDC_Device_SendByte
+ 533              	.LVL61:
+ 146:packetizer.c  ****   char *textB64 = NULL;
+ 534              		.loc 1 146 0
+ 535 0038 0020     		movs	r0, #0
+ 536              	.L60:
+ 537              	.LVL62:
+ 163:packetizer.c  ****   }
+ 164:packetizer.c  **** 
+ 165:packetizer.c  ****   return ret;
+ 166:packetizer.c  **** }
+ 538              		.loc 1 166 0
+ 539 003a 03B0     		add	sp, sp, #12
+ 540              	.LCFI12:
+ 541              		.cfi_remember_state
+ 542              		.cfi_def_cfa_offset 12
+ 543              		@ sp needed
+ 544 003c 30BD     		pop	{r4, r5, pc}
+ 545              	.LVL63:
+ 546              	.L64:
+ 547              	.LCFI13:
+ 548              		.cfi_restore_state
+ 153:packetizer.c  ****       /* Size computation overflow in base64url.c */
+ 549              		.loc 1 153 0
+ 550 003e 6368     		ldr	r3, [r4, #4]
+ 551 0040 23B1     		cbz	r3, .L61
+ 155:packetizer.c  ****     } else {
+ 552              		.loc 1 155 0 discriminator 1
+ 553 0042 0028     		cmp	r0, #0
+ 554 0044 14BF     		ite	ne
+ 555 0046 0820     		movne	r0, #8
+ 556              	.LVL64:
+ 557 0048 0920     		moveq	r0, #9
+ 558 004a F6E7     		b	.L60
+ 559              	.LVL65:
+ 560              	.L61:
+ 157:packetizer.c  ****     }
+ 561              		.loc 1 157 0
+ 562 004c 0820     		movs	r0, #8
+ 563              	.LVL66:
+ 564 004e F4E7     		b	.L60
+ 565              	.L66:
+ 566              		.align	2
+ 567              	.L65:
+ 568 0050 00000000 		.word	VirtualSerial_CDC_Interface
+ 569              		.cfi_endproc
+ 570              	.LFE197:
+ 572              		.text
+ 573              	.Letext0:
+ 574              		.file 2 "/usr/arm-none-eabi/include/machine/_default_types.h"
+ 575              		.file 3 "/usr/arm-none-eabi/include/sys/_stdint.h"
+ 576              		.file 4 "/usr/lib/gcc/arm-none-eabi/7.3.1/include/stddef.h"
+ 577              		.file 5 "/usr/arm-none-eabi/include/sys/lock.h"
+ 578              		.file 6 "/usr/arm-none-eabi/include/sys/_types.h"
+ 579              		.file 7 "/usr/arm-none-eabi/include/sys/reent.h"
+ 580              		.file 8 "/opt/XMClib/XMC_Peripheral_Library_v2.1.16/CMSIS/Include/core_cm4.h"
+ 581              		.file 9 "/opt/XMClib/XMC_Peripheral_Library_v2.1.16/CMSIS/Infineon/XMC4500_series/Include/system_X
+ 582              		.file 10 "/opt/XMClib/XMC_Peripheral_Library_v2.1.16/CMSIS/Infineon/XMC4500_series/Include/XMC4500
+ 583              		.file 11 "/usr/arm-none-eabi/include/stdlib.h"
+ 584              		.file 12 "/opt/XMClib/XMC_Peripheral_Library_v2.1.16/XMCLib/inc/xmc_usbd_regs.h"
+ 585              		.file 13 "/opt/XMClib/XMC_Peripheral_Library_v2.1.16/XMCLib/inc/xmc_usbd.h"
+ 586              		.file 14 "/opt/XMClib/XMC_Peripheral_Library_v2.1.16/ThirdPartyLibraries/USBlib/USB/Core/XMC4000/U
+ 587              		.file 15 "/opt/XMClib/XMC_Peripheral_Library_v2.1.16/ThirdPartyLibraries/USBlib/USB/Core/XMC4000/.
+ 588              		.file 16 "/opt/XMClib/XMC_Peripheral_Library_v2.1.16/ThirdPartyLibraries/USBlib/USB/Core/XMC4000/.
+ 589              		.file 17 "/opt/XMClib/XMC_Peripheral_Library_v2.1.16/ThirdPartyLibraries/USBlib/USB/Core/XMC4000/.
+ 590              		.file 18 "/opt/XMClib/XMC_Peripheral_Library_v2.1.16/ThirdPartyLibraries/USBlib/USB/Core/USBTask.h
+ 591              		.file 19 "/opt/XMClib/XMC_Peripheral_Library_v2.1.16/ThirdPartyLibraries/USBlib/USB/Class/Device/.
+ 592              		.file 20 "/opt/XMClib/XMC_Peripheral_Library_v2.1.16/ThirdPartyLibraries/USBlib/USB/Class/Device/C
+ 593              		.file 21 "VirtualSerial.h"
+ 594              		.file 22 "packetizer.h"
+ 595              		.file 23 "base64url.h"
+ 596              		.file 24 "<built-in>"
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 packetizer.c
+     /tmp/ccnTwZoc.s:17     .text.packetizerReceiveByteBlocking:0000000000000000 $t
+     /tmp/ccnTwZoc.s:24     .text.packetizerReceiveByteBlocking:0000000000000000 packetizerReceiveByteBlocking
+     /tmp/ccnTwZoc.s:60     .text.packetizerReceiveByteBlocking:0000000000000020 $d
+     /tmp/ccnTwZoc.s:65     .text.packetizerReadHeader:0000000000000000 $t
+     /tmp/ccnTwZoc.s:72     .text.packetizerReadHeader:0000000000000000 packetizerReadHeader
+     /tmp/ccnTwZoc.s:258    .text.packetizerReadHeader:00000000000000dc $d
+     /tmp/ccnTwZoc.s:263    .text.packetizerReadText:0000000000000000 $t
+     /tmp/ccnTwZoc.s:270    .text.packetizerReadText:0000000000000000 packetizerReadText
+     /tmp/ccnTwZoc.s:421    .text.packetizerReceive:0000000000000000 $t
+     /tmp/ccnTwZoc.s:428    .text.packetizerReceive:0000000000000000 packetizerReceive
+     /tmp/ccnTwZoc.s:474    .text.packetizerSend:0000000000000000 $t
+     /tmp/ccnTwZoc.s:481    .text.packetizerSend:0000000000000000 packetizerSend
+     /tmp/ccnTwZoc.s:568    .text.packetizerSend:0000000000000050 $d
+                           .group:0000000000000000 wm4.0.36326cb9f2f282db52d0a8f4d7f6f490
+                           .group:0000000000000000 wm4.USB.h.376.cfdb9ecb25c70fec676f585dede264a7
+                           .group:0000000000000000 wm4.Common.h.60.c2f00e237f5994003db83c2422602b22
+                           .group:0000000000000000 wm4._newlib_version.h.4.875b979a44719054cd750d0952ad3fd6
+                           .group:0000000000000000 wm4.features.h.33.5bd1eea2d80518b50f7af0b5ce6750e0
+                           .group:0000000000000000 wm4._default_types.h.15.247e5cd201eca3442cbf5404108c4935
+                           .group:0000000000000000 wm4._intsup.h.10.cce27fed8484c08a33f522034c30d2b5
+                           .group:0000000000000000 wm4._stdint.h.10.c24fa3af3bc1706662bb5593a907e841
+                           .group:0000000000000000 wm4.stdint.h.23.d53047a68f4a85177f80b422d52785ed
+                           .group:0000000000000000 wm4.stdbool.h.29.07dce69c3b78884144b7f7bd19483461
+                           .group:0000000000000000 wm4.newlib.h.8.f6e543eac3f2f65163ba2ffe3b04987b
+                           .group:0000000000000000 wm4.ieeefp.h.77.220d9cccac42cd58761758bee2df4ce6
+                           .group:0000000000000000 wm4.config.h.220.6cac6a9685cfce5e83c17784171638d9
+                           .group:0000000000000000 wm4._ansi.h.31.de524f58584151836e90d8620a16f8e8
+                           .group:0000000000000000 wm4.stddef.h.39.99b5021e28f91cdb161c889e07266673
+                           .group:0000000000000000 wm4.lock.h.2.1461d1fff82dffe8bfddc23307f6484f
+                           .group:0000000000000000 wm4._types.h.125.5cf8a495f1f7ef36777ad868a1e32068
+                           .group:0000000000000000 wm4.stddef.h.161.5349cb105733e8777bfb0cf53c4e3f34
+                           .group:0000000000000000 wm4._types.h.184.03611d4f6b5bec9997bcf4279eceba07
+                           .group:0000000000000000 wm4.reent.h.17.90c2574d4acdcfce933db5cb09ff35fe
+                           .group:0000000000000000 wm4.cdefs.h.47.14fad0b327eb9dcf106599b738d85132
+                           .group:0000000000000000 wm4.string.h.15.dab3980bf35408a4c507182805e2de3a
+                           .group:0000000000000000 wm4.stddef.h.161.19e15733342b50ead2919490b095303e
+                           .group:0000000000000000 wm4.BoardTypes.h.52.ca64813ccee737bcc2115eab5e075fdb
+                           .group:0000000000000000 wm4.CompilerSpecific.h.55.4a5e5ff77cd35e49c89cf2115251aee0
+                           .group:0000000000000000 wm4.Attributes.h.56.73b3ee26b0836c2dec569a5fa6f1b355
+                           .group:0000000000000000 wm4.xmc_device.h.61.ba2d082e12f51240746cffdd60d42b81
+                           .group:0000000000000000 wm4.XMC4500.h.55.9aa45b9b5790506b2dcb963e4e7adeaf
+                           .group:0000000000000000 wm4.core_cm4.h.32.6c6eb1c8daeca23ce7ba79c8e8120d52
+                           .group:0000000000000000 wm4.cmsis_gcc.h.26.91b63349961c35637933e4fba51b867b
+                           .group:0000000000000000 wm4.core_cm4.h.172.fdd5a388a160bb6ff767b7d7ee212268
+                           .group:0000000000000000 wm4.system_XMC4500.h.42.99124977c10ca8844a71949adbeabd70
+                           .group:0000000000000000 wm4.XMC4500.h.208.b340195df97f067735c4c769ba59985a
+                           .group:0000000000000000 wm4.xmc_device.h.1460.8860499b404961ffcfbb8d1fefcb2146
+                           .group:0000000000000000 wm4.xmc_common.h.92.3f4336a80569affab05a81145b87c2fc
+                           .group:0000000000000000 wm4.Endianness.h.57.3ac00c5468f4b91b806a0e6dba047e9c
+                           .group:0000000000000000 wm4.Common.h.105.4b937a9cc9dcdb26c3f07541b0b763a8
+                           .group:0000000000000000 wm4.USBController.h.49.cbfc73805155b6fff6267400af3f4eec
+                           .group:0000000000000000 wm4.stdlib.h.13.4ed386f5c1a80d71e72172885d946ef2
+                           .group:0000000000000000 wm4.alloca.h.8.dfc0c703c47ec3e69746825b17d9e66d
+                           .group:0000000000000000 wm4.stdlib.h.56.d4493cd3736e51e9d56335045f26df45
+                           .group:0000000000000000 wm4.xmc_usbd_regs.h.80.57c6c85fa0ecbc9f8327ce445aebb9bc
+                           .group:0000000000000000 wm4.xmc4_scu.h.83.0449f5880ac071460ec1a8072311ea51
+                           .group:0000000000000000 wm4.xmc_usbd.h.122.ce57a9e6a9da48ee33ece02813c49593
+                           .group:0000000000000000 wm4.USBController_XMC4000.h.71.902f2653e09cb8b25245faa82cc6b907
+                           .group:0000000000000000 wm4.StdDescriptors.h.73.7d17e8be7a73b855fc0f8827303b7597
+                           .group:0000000000000000 wm4.Endpoint.h.73.3734de3e84ab23fb43d81f41fba620ec
+                           .group:0000000000000000 wm4.Device_XMC4000.h.86.6803bdd99d84e764a570256c87a24d0a
+                           .group:0000000000000000 wm4.StdRequestType.h.50.461dce94a3ee1fa9ff31ec5f28bd9699
+                           .group:0000000000000000 wm4.ConfigDescriptors.h.51.0d67ebf453774188abf5a503ba8f6735
+                           .group:0000000000000000 wm4.CDCClass.h.61.0d41ba255f7ce6f076fd610d8396dd1f
+                           .group:0000000000000000 wm4.CDCClassCommon.h.72.14ca578d8547e19a8a0c0d2d328483bd
+                           .group:0000000000000000 wm4.stdio.h.27.3fc80220048df77954e38daec3bb9670
+                           .group:0000000000000000 wm4.stdarg.h.34.3a23a216c0c293b3d2ea2e89281481e6
+                           .group:0000000000000000 wm4.types.h.40.e8c16e7ec36ba55f133d0616070e25fc
+                           .group:0000000000000000 wm4._endian.h.31.65a10590763c3dde1ac4a7f66d7d4891
+                           .group:0000000000000000 wm4.endian.h.9.49f3a4695c1b61e8a0808de3c4a106cb
+                           .group:0000000000000000 wm4._timeval.h.30.0e8bfd94e85db17dda3286ee81496fe6
+                           .group:0000000000000000 wm4.timespec.h.41.d855182eb0e690443ab8651bcedca6e1
+                           .group:0000000000000000 wm4.select.h.19.97ca6fd0c752a0f3b6719fd314d361e6
+                           .group:0000000000000000 wm4.types.h.69.ed3eae3cf73030a737515151ebcab7a1
+                           .group:0000000000000000 wm4.sched.h.22.c60982713a5c428609783c78f9c78d95
+                           .group:0000000000000000 wm4._pthreadtypes.h.36.fcee9961c35163dde6267ef772ad1972
+                           .group:0000000000000000 wm4.stdio.h.2.4aa87247282eca6c8f36f9de33d8df1a
+                           .group:0000000000000000 wm4.stdio.h.81.932d0c162786b883f622b8d05c120c78
+                           .group:0000000000000000 wm4.HIDClass.h.62.6bb32c59177b21a83b8e65c5a1b0a615
+                           .group:0000000000000000 wm4.HIDReportData.h.47.f13f4956396e0bec70835fe634fcc24d
+                           .group:0000000000000000 wm4.HIDParser.h.88.4b86fe94cb8d01713592cdd0391b606b
+                           .group:0000000000000000 wm4.HIDClassCommon.h.71.a60cdf9d7cd69289f43dde215b509193
+                           .group:0000000000000000 wm4.MassStorageClass.h.61.e9235f3bd090b77f36343f082ef93107
+                           .group:0000000000000000 wm4.MassStorageClassCommon.h.51.6aefecf288eb3c3c6c9bde61e26dd765
+                           .group:0000000000000000 wm4.Descriptors.h.44.84a4fd312957d0d42fb6aaa001850ba4
+                           .group:0000000000000000 wm4.base64url.h.26.ed1fee22e760dd991443f292d5830091
+                           .group:0000000000000000 wm4.crypto.h.8.3c7e0671468cbc28e07567ab2d290f6b
+                           .group:0000000000000000 wm4.packetizer.h.44.8cfee869db25400923a603e5cc82ed56
+
+UNDEFINED SYMBOLS
+CDC_Device_USBTask
+CDC_Device_BytesReceived
+CDC_Device_ReceiveByte
+VirtualSerial_CDC_Interface
+memset
+isbase64
+base64_decode
+malloc
+__stack_chk_fail
+__stack_chk_guard
+calloc
+base64_decode_alloc
+free
+base64_encode_alloc
+CDC_Device_SendByte
+CDC_Device_SendData
